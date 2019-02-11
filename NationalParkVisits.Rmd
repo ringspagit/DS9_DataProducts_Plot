@@ -1,0 +1,93 @@
+---
+title: "US National Parks"
+subtitle: "Visit Statistics 2008-2017"
+author: "Paul Ringsted"
+date: "2/10/2019"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo=FALSE, eval=TRUE)
+```
+
+```{r libraries, message=FALSE}
+#-------------------------------------------------------------------------------------
+library(plotly)
+library(kableExtra)
+library(data.table)
+```
+
+```{r get_data}
+#-------------------------------------------------------------------------------------
+# Load parks data from current directory
+parks<-read.csv('parks.csv',stringsAsFactors = FALSE,skip=3)
+df <- parks[which(grepl("NP$",parks[,1]) & !is.na(parks[,2])),1:3]
+colnames(df)<-c("ParkName","Year","Visits")
+df$Visits<-as.numeric(gsub(",", "", df$Visits))         # Remove thousands separator
+num_parks<-length(unique(df$ParkName))
+
+# Build aggregate totals and add to the dataframe
+tots<-aggregate(df$Visits,by=list(df$Year),FUN=sum)
+tots_name<-rep("All NP",nrow(tots))
+tots_df<-cbind(tots_name,tots)
+colnames(tots_df)<-colnames(df)
+tots_df$ParkName<-as.character(tots_df$ParkName)
+df2<-rbind(tots_df,df)
+parklist<-unique(df2$ParkName)
+```
+
+## US National Parks - Visitation Data
+<font size="4">
+Data for visits to US National Parks was obtained from the NPS Integrated Resource Management Applications (IRMA) website, filtered for parks ending in "NP" (```r num_parks``` parks).
+
+Link to data:
+
+</font>
+<font size="2">
+https://irma.nps.gov/Stats/SSRSReports/National%20Reports/Annual%20Visitation%20By%20Park%20(1979%20-%20Last%20Calendar%20Year)
+</font>
+<font size="4">
+
+Total visits by Year (millions, all NPs):
+```{r do_table}
+tots_table<-tots_df[,2:3]
+tots_table$Visits<-tots_table$Visits/1000000
+transpose(tots_table)[2,] %>% kable(
+                col.names=tots_table[,1],
+                row.names=F,
+                booktabs=T,
+                digits=rep(2,nrow(tots_table))) %>%
+                kable_styling(latex_options = "hold_position")
+```
+</font>
+
+## Visits by Park
+```{r plot, echo = FALSE}
+buttons<-list()
+for (i in 1:length(parklist)) {
+        buttons[[i]]<-list(method="restyle",args=list("transforms[0].value",parklist[i]),label=parklist[i])
+}
+
+df2 %>% plot_ly(
+                type = 'scatter', 
+                x = ~Year,
+                y = ~Visits,
+                text = ~ParkName,
+                mode = 'lines', 
+                transforms = list(
+                        list(
+                                type = 'filter',
+                                target = ~ParkName,
+                                operation = '=',
+                                value = unique(df2$ParkName)[1]
+                        )
+                )) %>% 
+                layout(updatemenus = list(
+                                list(
+                                    type = 'dropdown',
+                                    active = 0,
+                                    buttons = buttons
+                                )
+                ))
+```
